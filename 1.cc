@@ -13,14 +13,6 @@ static void usage(void) {
 	exit(1);
 }
 
-static int up2pow(int i) {
-	int r = 1;
-
-	while(r < i)
-		r <<= 1;
-	return r;
-}
-
 static unsigned bitrev_inc(unsigned i, unsigned N) {
 	return (N & i) ? bitrev_inc(i ^ N, N >> 1) : i ^ N;
 }
@@ -113,7 +105,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 
 	cv::Mat edge;
-	int d = up2pow(std::max(src.rows, src.cols));
+	int d = 512;
 {
 	/* Resize. */
 	cv::Mat resized;
