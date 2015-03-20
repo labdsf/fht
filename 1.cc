@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <assert.h>
 #include <math.h>
 #include <unistd.h>
 
@@ -22,11 +23,9 @@ static unsigned bitrev_inc(unsigned i, unsigned N) {
  * Height of img should be power of 2
  * Shift ranges from 0 to height of img
  */
-static void FHT(const cv::Mat &img, cv::Mat &accum) {
+static void FHT(cv::Mat &img) {
 	int width = img.cols;
 	int height = img.rows;
-
-	img.convertTo(accum, CV_16S);
 
 	for(int h = 2; h <= height; h <<= 1)
 	for(int y = 0; y < height; y += h) {
@@ -35,10 +34,10 @@ static void FHT(const cv::Mat &img, cv::Mat &accum) {
 			int u = y + s;
 			int d = u + h / 2;
 
-			cv::Mat t = accum.row(d).clone();
+			cv::Mat t = img.row(d).clone();
 			for(int i = 0; i < width; i++) {
-				accum.at<short>(d, i) = (i + 2 * ss + 1 < width) ? (accum.at<short>(u, i) + t.at<short>(i + ss + 1)) / 2 : 0;
-				accum.at<short>(u, i) = (i + 2 * ss     < width) ? (accum.at<short>(u, i) + t.at<short>(i + ss)    ) / 2 : 0;
+				img.at<uchar>(d, i) = (i + 2 * ss + 1 < width) ? (img.at<uchar>(u, i) + t.at<uchar>(i + ss + 1)) / 2 : 0;
+				img.at<uchar>(u, i) = (i + 2 * ss     < width) ? (img.at<uchar>(u, i) + t.at<uchar>(i + ss))     / 2 : 0;
 			}
 			ss = bitrev_inc(ss, h / 4);
 		}
@@ -48,9 +47,9 @@ static void FHT(const cv::Mat &img, cv::Mat &accum) {
 	for(int i = 0; i < height; i++) {
 		if(i < k) {
 			/* swap */
-			cv::Mat t = accum.row(i).clone();
-			accum.row(k).copyTo(accum.row(i));
-			t.copyTo(accum.row(k));
+			cv::Mat t = img.row(i).clone();
+			img.row(k).copyTo(img.row(i));
+			t.copyTo(img.row(k));
 		}
 		k = bitrev_inc(k, height / 2);
 	}
@@ -61,26 +60,22 @@ static void FHT(const cv::Mat &img, cv::Mat &accum) {
  * Maps both results onto the (x, x + shift) space
  */
 static void DoubleFHT(const cv::Mat &src, cv::Mat &dst) {
-	cv::Mat acc;
-
 	int w = src.cols;
-	dst.create(w, w, CV_16S);
-	FHT(src, acc);
-	for(int x = 0; x < w; x++)  {
-		int smax = w - x;
-		for(int s = 0; s < smax; s++)
-			dst.at<short>(x + s, x) = acc.at<short>(s, x);
-	}
+	assert(src.rows == w);
+	dst.create(w, w, CV_8U);
+	cv::Mat acc;
+	src.convertTo(acc, CV_8U);
+	FHT(acc);
+	for(int x = 0; x < w; x++)
+		for(int s = 0; s < w - x; s++)
+			dst.at<uchar>(x + s, x) = acc.at<uchar>(s, x);
 
-	cv::Mat f;
-	cv::flip(src, f, 1);
-	FHT(f, acc);
+	cv::flip(src, acc, 1);
+	FHT(acc);
 
-	for(int x = 0; x < w; x++)  {
-		int smax = w - x;
-		for(int s = 0; s < smax; s++)
-			dst.at<short>(w - 1 - x - s, w - 1 - x) = acc.at<short>(s, x);
-	}
+	for(int x = 0; x < w; x++)
+		for(int s = 0; s < w - x; s++)
+			dst.at<uchar>(w - 1 - x - s, w - 1 - x) = acc.at<uchar>(s, x);
 }
 
 int main(int argc, char *argv[]) {
@@ -145,17 +140,17 @@ int main(int argc, char *argv[]) {
 
 	/* The vanishing point is above image, so calculate FHT only for positive shift. */
 	grad *= 2;
-	FHT(grad, accum);
+	FHT(grad);
 
 	cv::Point maxloc;
-	cv::minMaxLoc(accum, 0, 0, 0, &maxloc);
+	cv::minMaxLoc(grad, 0, 0, 0, &maxloc);
 
 	cv::Scalar green(0, 255, 0);
 	if(dflag) {
 		cv::Mat mnorm;
-		cv::normalize(accum, mnorm, 0, 255, cv::NORM_MINMAX, CV_8U);
+		cv::normalize(grad, mnorm, 0, 255, cv::NORM_MINMAX, CV_8U);
 		cv::cvtColor(mnorm, mnorm, CV_GRAY2BGR);
-		cv::circle(mnorm, maxloc, 15, cv::Scalar(0, 255, 0), 3);
+		cv::circle(mnorm, maxloc, 15, green, 3);
 		cv::imwrite("hough2.jpg", mnorm);
 	}
 
