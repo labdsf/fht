@@ -143,20 +143,18 @@ int main(int argc, char *argv[]) {
 		cv::imwrite("hough1.jpg", mnorm);
 	}
 
-	cv::Mat image32f;
-	accum.convertTo(image32f, CV_32F);
-
-	for(int i = 0; i < image32f.rows; i++)
-		cv::subtract(image32f.row(i), mean(image32f.row(i)), image32f.row(i));
-	image32f = image32f.mul(image32f);
-
-	cv::Mat sigma;
-	cv::normalize(image32f, sigma, 0, 255, cv::NORM_MINMAX, CV_8U);
+	/* Gradient. */
+	cv::Mat grad_x, grad_y;
+	cv::Sobel(accum, grad_x, CV_16S, 1, 0);
+	cv::Sobel(accum, grad_y, CV_16S, 0, 1);
+	cv::convertScaleAbs(grad_x, grad_x);
+	cv::convertScaleAbs(grad_y, grad_y);
+	cv::Mat grad = grad_x + grad_y;
 	if(dflag)
-		cv::imwrite("res2.jpg", sigma);
+		cv::imwrite("grad.jpg", grad);
 
 	/* The vanishing point is above image, so calculate FHT only for positive shift. */
-	FHT(sigma, accum);
+	FHT(grad, accum);
 
 	cv::Point maxloc;
 	cv::minMaxLoc(accum, 0, 0, 0, &maxloc);
