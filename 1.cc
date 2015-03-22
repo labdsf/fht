@@ -26,7 +26,7 @@ static void FHT(const cv::Mat &img, cv::Mat &accum) {
 	int width = img.cols;
 	int height = img.rows;
 
-	img.convertTo(accum, CV_32S);
+	img.convertTo(accum, CV_16S);
 
 	for(int h = 2; h <= height; h <<= 1)
 	for(int y = 0; y < height; y += h) {
@@ -37,8 +37,8 @@ static void FHT(const cv::Mat &img, cv::Mat &accum) {
 
 			cv::Mat t = accum.row(d).clone();
 			for(int i = 0; i < width; i++) {
-				accum.at<int>(d, i) = (i + 2 * ss + 1 < width) ? (accum.at<int>(u, i) + t.at<int>(i + ss + 1)) : 0;
-				accum.at<int>(u, i) = (i + 2 * ss     < width) ? (accum.at<int>(u, i) + t.at<int>(i + ss)    ) : 0;
+				accum.at<short>(d, i) = (i + 2 * ss + 1 < width) ? (accum.at<short>(u, i) + t.at<short>(i + ss + 1)) / 2 : 0;
+				accum.at<short>(u, i) = (i + 2 * ss     < width) ? (accum.at<short>(u, i) + t.at<short>(i + ss)    ) / 2 : 0;
 			}
 			ss = bitrev_inc(ss, h / 4);
 		}
@@ -64,12 +64,12 @@ static void DoubleFHT(const cv::Mat &src, cv::Mat &dst) {
 	cv::Mat acc;
 
 	int w = src.cols;
-	dst.create(w, w, CV_32S);
+	dst.create(w, w, CV_16S);
 	FHT(src, acc);
 	for(int x = 0; x < w; x++)  {
 		int smax = w - x;
 		for(int s = 0; s < smax; s++)
-			dst.at<int>(x + s, x) = acc.at<int>(s, x);
+			dst.at<short>(x + s, x) = acc.at<short>(s, x);
 	}
 
 	cv::Mat f;
@@ -79,7 +79,7 @@ static void DoubleFHT(const cv::Mat &src, cv::Mat &dst) {
 	for(int x = 0; x < w; x++)  {
 		int smax = w - x;
 		for(int s = 0; s < smax; s++)
-			dst.at<int>(w - 1 - x - s, w - 1 - x) = acc.at<int>(s, x);
+			dst.at<short>(w - 1 - x - s, w - 1 - x) = acc.at<short>(s, x);
 	}
 }
 
@@ -104,39 +104,29 @@ int main(int argc, char *argv[]) {
 	if(!src.data)
 		return 1;
 
-	cv::Mat edge;
+	cv::Mat resized;
 	int d = 512;
 {
-	/* Resize. */
-	cv::Mat resized;
-	cv::resize(src, resized, cv::Size(d, d));
-
 	/* Grayscale. */
 	cv::Mat gray;
-	cv::cvtColor(resized, gray, CV_BGR2GRAY);
+	cv::cvtColor(src, gray, CV_BGR2GRAY);
 	if(dflag)
 		cv::imwrite("gray.jpg", gray);
 
-	/* Blur. */
-	cv::blur(gray, gray, cv::Size(3, 3));
-	if(dflag)
-		cv::imwrite("blur.jpg", gray);
-
 	/* Threshold. */
-	cv::Mat bw;
-	cv::adaptiveThreshold(gray, bw, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 15, 2);
+	cv::adaptiveThreshold(gray, gray, 127, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 15, 2);
 	if(dflag)
-		cv::imwrite("bw.jpg", bw);
+		cv::imwrite("bw.jpg", gray);
 
-	/* Edge detection. */
-	cv::Canny(bw, edge, 100, 300, 3);
+	/* Resize. */
+	cv::resize(gray, resized, cv::Size(d, d));
 	if(dflag)
-		cv::imwrite("canny.jpg", edge);
+		cv::imwrite("resized.jpg", resized);
 }
 
 	/* Hough */
 	cv::Mat accum;
-	DoubleFHT(edge, accum);
+	DoubleFHT(resized, accum);
 	if(dflag) {
 		cv::Mat mnorm;
 		cv::normalize(accum, mnorm, 0, 255, cv::NORM_MINMAX, CV_8U);
@@ -154,6 +144,7 @@ int main(int argc, char *argv[]) {
 		cv::imwrite("grad.jpg", grad);
 
 	/* The vanishing point is above image, so calculate FHT only for positive shift. */
+	grad *= 2;
 	FHT(grad, accum);
 
 	cv::Point maxloc;
