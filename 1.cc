@@ -161,6 +161,7 @@ int main(int argc, char *argv[]) {
 	cv::Point maxloc;
 	cv::minMaxLoc(accum, 0, 0, 0, &maxloc);
 
+	cv::Scalar green(0, 255, 0);
 	if(dflag) {
 		cv::Mat mnorm;
 		cv::normalize(accum, mnorm, 0, 255, cv::NORM_MINMAX, CV_8U);
@@ -169,47 +170,62 @@ int main(int argc, char *argv[]) {
 		cv::imwrite("hough2.jpg", mnorm);
 	}
 
-	double m = maxloc.x * src.cols / (d - maxloc.y);
-	double h = d        * src.rows / (d - maxloc.y);
+	cv::Point2f c(.5 * src.cols, .5 * src.rows);
+	cv::Point2f v(maxloc.x * src.cols / (d - maxloc.y) - c.x,
+	              .5 * src.rows - d * src.rows / (d - maxloc.y));
 
 	if(dflag) {
-		int x1 = maxloc.x              * src.cols / d;
-		int x2 = (maxloc.x + maxloc.y) * src.cols / d;
-		cv::line(src, cv::Point(0,        src.rows), cv::Point(m, src.rows - h), cv::Scalar(0, 255, 0), 3);
-		cv::line(src, cv::Point(src.cols, src.rows), cv::Point(m, src.rows - h), cv::Scalar(0, 255, 0), 3);
-		cv::circle(src, cv::Point(x1, 0), 15, cv::Scalar(0, 255, 0), 3);
-		cv::circle(src, cv::Point(x2, 0), 15, cv::Scalar(0, 255, 0), 3);
+		cv::line(src, cv::Point(0,        src.rows), c + v, green, 3);
+		cv::line(src, cv::Point(src.cols, src.rows), c + v, green, 3);
+		cv::Point p1(maxloc.x              * src.cols / d, 0);
+		cv::Point p2((maxloc.x + maxloc.y) * src.cols / d, 0);
+		cv::circle(src, p1, 15, green, 3);
+		cv::circle(src, p2, 15, green, 3);
 		cv::imwrite("debug.jpg", src);
 	}
 
-	cv::Mat result;
+	/* Perspective transform. */
+	double tiltangle = atan2(-v.x, -v.y); // - gamma
 
-	cv::Mat mirror = (cv::Mat_<double>(3, 3) <<
+	double ta = sqrt(- c.y * cos(tiltangle) / v.y);
+	double f = c.y / ta;
+	double a = atan(ta); // - alpha
+
+	cv::Mat camera = (cv::Mat_<double>(3, 3) <<
+	f, 0, c.x,
+	0, f, c.y,
+	0, 0, 1);
+	cv::Mat uncamera;
+	cv::invert(camera, uncamera);
+
+	cv::Mat R = (cv::Mat_<double>(3, 3) <<
 	1, 0, 0,
-	0, -1, 0,
-	0, 0, 1);
+	0, cos(a), -sin(a),
+	0, sin(a), cos(a)
+	) *
+	(cv::Mat_<double>(3, 3) <<
+	cos(tiltangle), -sin(tiltangle), 0,
+	sin(tiltangle), cos(tiltangle), 0,
+	0, 0, 1
+	);
 
-	cv::Mat shift = (cv::Mat_<double>(3, 3) <<
-	1, 0, -m,
-	0, 1, src.rows,
-	0, 0, 1);
+	cv::Mat A = camera * R * uncamera;
 
-	cv::Mat perspective = (cv::Mat_<double>(3, 3) <<
-	1, 0,       0,
-	0, 1,       0,
-	0, -1. / h, 1);
-
-	cv::Mat A = mirror * perspective * shift * mirror;
-	std::vector<cv::Point2f> corners(2);
+	/* Find bounding rect. */
+	std::vector<cv::Point2f> corners(4);
 	corners[0] = cv::Point2f(0,        0);
 	corners[1] = cv::Point2f(src.cols, 0);
+	corners[2] = cv::Point2f(0, src.rows);
+	corners[3] = cv::Point2f(src.cols, src.rows);
 	cv::perspectiveTransform(corners, corners, A);
+	cv::Rect rect = cv::boundingRect(corners);
 
-	cv::Mat unshift = (cv::Mat_<double>(3, 3) <<
-	1, 0, -corners[0].x,
-	0, 1, -corners[0].y,
+	cv::Mat shift = (cv::Mat_<double>(3, 3) <<
+	1, 0, -rect.x,
+	0, 1, -rect.y,
 	0, 0, 1);
 
-	cv::warpPerspective(src, result, unshift * A, cv::Size(corners[1].x - corners[0].x, -corners[0].y), cv::INTER_LINEAR);
+	cv::Mat result;
+	cv::warpPerspective(src, result, shift * A, cv::Size(rect.width, rect.height), cv::INTER_LINEAR);
 	cv::imwrite(argv[1], result);
 }
