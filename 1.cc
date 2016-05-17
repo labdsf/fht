@@ -14,6 +14,10 @@ static void usage(void) {
 	exit(1);
 }
 
+/*
+ * Bit reversal for FHT addressing.
+ * Proudly stolen from http://nixforums.org/post-726855.html#726855
+ */
 static unsigned bitrev_inc(unsigned i, unsigned N) {
 	return (N & i) ? bitrev_inc(i ^ N, N >> 1) : i ^ N;
 }
