@@ -1,2 +1,8 @@
 fht
 *.jpg
+
+*.aux
+*.bbl
+*.blg
+*.log
+*.pdf

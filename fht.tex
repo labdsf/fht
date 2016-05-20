@@ -1,0 +1,136 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+
+\usepackage{tikz}
+\usetikzlibrary{calc}
+
+\begin{document}
+
+\section{Camera matrix}
+
+\begin{equation}
+C = K R_x R_y R_z,
+\end{equation}
+where $K$ is a camera calibration matrix.
+
+\subsection{Camera calibration matrix}
+
+\begin{equation}
+K = \begin{bmatrix}
+f & 0 & c_x \\
+0 & f & c_y \\
+0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+
+\subsection{Rotation matrices}
+
+\begin{subequations}
+\begin{equation}
+R_x = \begin{bmatrix}
+1 & 0 & 0 \\
+0 & \cos(\alpha_x) & -sin(\alpha_x) \\
+0 & \sin(\alpha_x) & \cos(\alpha_x)
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+R_y = \begin{bmatrix}
+\cos(\alpha_y) & 0 & \sin(\alpha_y) \\
+0 & 1 & 0 \\
+-\sin(\alpha_y) & 0 & \cos(\alpha_y)
+\end{bmatrix}
+\end{equation}
+
+\begin{equation}
+R_z = \begin{bmatrix}
+\cos(\alpha_z) & -\sin(\alpha_z) & 0 \\
+\sin(\alpha_z) & \cos(\alpha_z) & 0 \\
+0 & 0 & 1
+\end{bmatrix}
+\end{equation}
+\end{subequations}
+
+\section{Vanishing points}
+
+\subsection{Vanishing point detection}
+
+Vanishing point is detected using two Hough transforms in sequence as proposed in \cite{nikolaev2008hough} and later reinvented in \cite{chen2010new}.
+In between first and second transforms image gradient is calculated.
+
+\subsection{Vanishing point coordinates}
+
+Vanishing point matrix is calculated as follows \cite{gallagher2005using}:
+\begin{equation}
+V = K R_z R_x R_y
+\end{equation}
+
+First, the camera is rotated around $y$ axis, then around $x$ axis, and then tilted around $z$ axis.
+
+We are only interested in vertical vanishing point:
+\begin{equation}
+v_y = V \begin{bmatrix}
+0 \\
+1 \\
+0
+\end{bmatrix} =
+\begin{bmatrix}
+\sin(\alpha_x) c_x - \cos(\alpha_x) \sin(\alpha_z) f \\
+\cos(\alpha_x) \cos(\alpha_z) f + \sin(\alpha_x) c_y \\
+\sin(\alpha_x)
+\end{bmatrix}
+\end{equation}
+
+Note that coordinates of this vanishing point don't depend on $\alpha_y$.
+For this reason we have to assume $\alpha_y = 0$.
+
+Now, we have to undo two rotations.
+In order to do that, we have to determine $f$, $\alpha_x$ and $\alpha_z$.
+
+$\alpha_z$ is an angle between the $y$ axis and vanishing point position vector in the image plane.
+In the code it is calculated with \texttt{atan2} function.
+
+Now, we set $\alpha_z = 0$ and proceed to determine $f$ and $\alpha_x$.
+Because the camera is not tilted, vanishing point lies on the $y$ axis of the image plain.
+It is impossible to find two numbers, $f$ and $\alpha_x$, from one number.
+We have to make an assumption that bottom of the image corresponds to the horizon.
+
+\begin{tikzpicture}[
+scale=7,
+axis/.style={very thick, ->},
+]
+\draw[axis] (-0.1,0)  -- (1.1,0) node(xline)[right] {$Z$};
+\draw[axis] (0,-0.1) -- (0,1.1) node(yline)[above] {$Y$};
+
+\draw (0.5,0) -- (1.0,1.0);
+\draw (1.0,0) -- (1.0,1.0);
+\draw (1,1) -- (1.0,1.0);
+
+\coordinate (A) at (0.5,0);
+\coordinate (B) at (1,1);
+\coordinate (P) at (1,0);
+\coordinate (Q) at ($(A)!(P)!(B)$);
+
+\draw (Q) -- node[above] {$f$} (P);
+\path (Q) -- node[left] {$c_y$} (A);
+\path (Q) -- node[left] {$v_y$} (B);
+
+\end{tikzpicture}
+
+\begin{equation}
+v_y = f \cot(\alpha_x)
+\end{equation}
+\begin{equation}
+f = c_y \cot(\alpha_x)
+\end{equation}
+
+Using these two equations, we can find that
+\begin{equation}
+\tan(\alpha_x) = \sqrt{\frac{c_y}{v_y}}
+\end{equation}
+
+\bibliographystyle{unsrt}
+\bibliography{fht}
+
+\end{document}
