@@ -3,7 +3,7 @@
 \usepackage{amsmath}
 
 \usepackage{tikz}
-\usetikzlibrary{calc}
+\usetikzlibrary{calc,angles,quotes}
 
 \begin{document}
 
@@ -115,6 +115,9 @@ axis/.style={very thick, ->},
 \draw (Q) -- node[above] {$f$} (P);
 \path (Q) -- node[left] {$c_y$} (A);
 \path (Q) -- node[left] {$v_y$} (B);
+
+\path pic["$\alpha_x$", draw, angle eccentricity = 1.8] {angle = A--B--P};
+\path pic["$\alpha_x$", draw, angle eccentricity = 1.8] {angle = Q--P--A};
 
 \end{tikzpicture}
 
