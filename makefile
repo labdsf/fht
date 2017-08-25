@@ -1,3 +1,6 @@
+CXXFLAGS = `pkg-config --cflags opencv`
+LDFLAGS = `pkg-config --libs opencv`
+
 all: fht.pdf Tecumseh_Building_front.out.jpg
 
 fht.pdf: fht.tex fht.bib
