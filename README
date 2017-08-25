@@ -1,6 +1,0 @@
-This repository contains implementation of discrete fast Hough transform,
-as described in [1].  As an example, FHT is used to find vanishing point
-and rectify building image.
-
-[1] Martin L. Brady, A Fast Discrete Approximation Algorithm for the Radon Transform
-    http://dx.doi.org/10.1137/S0097539793256673
